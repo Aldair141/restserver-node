@@ -8,3 +8,4 @@ Este servicio incluye:
 . Carpeta pública para mostrar una página web como carátula
 . Procesos básico (Create, Read, Update, Delete)
 . Ordenamiento de las funciones y validaciones para mejor lectura y mantenimiento del software
+. Uso de archivo .env para las variables de entorno

@@ -1,12 +1,26 @@
 const { request, response } = require('express');
 const bcryptjs = require('bcryptjs');
-const nodemailer = require("nodemailer");
 
 const Usuario = require('../models/user');
+const { enviarCorreo } = require('../helpers/validation-database');
 
-const usuariosGET = (req = request, res = response) => {
+const usuariosGET = async(req = request, res = response) => {
+
+    //query
+    const query = { estado: true };
+    const { limite = 2, desde = 0 } = req.query;
+
+    //Si ambas consultas no dependen del otro, no es necesario que se esperen
+    //Usar una función que ejecute las promesas en paralelo
+    //Desestructuración de arreglos
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments(query),
+        Usuario.find(query).skip(Number(desde)).limit(Number(limite))
+    ]);
+
     res.json({
-        message: 'Llamando al método GET'
+        total,
+        usuarios
     });
 }
 
@@ -28,60 +42,43 @@ const usuariosPOST = async(req = request, res = response) => {
     usuario.save();
 
     //Enviar correo
-    const transporter = nodemailer.createTransport({
-        host: 'mail.dbuhos.com',
-        name: 'mail.dbuhos.com',
-        port: 465,
-        secure: true,
-        auth: {
-            user: 'contacto@dbuhos.com',
-            pass: '@@buhos@@'
-        },
-        tls: {
-            rejectUnauthorized: false
-        }
+    await enviarCorreo(email).catch((err) => {
+        console.log('Error:', err);
+    }).then(() => {
+        console.log('Correo enviado satisfactoriamente.');
     });
 
-    transporter.verify((err, success) => {
-        if (err) {
-            console.log(err);
-        } else {
-            console.log("El servidor está listo para enviar mensajes.");
-        }
-    });
-
-    await transporter.sendMail({
-        from: 'contacto@dbuhos.com',
-        to: email, //email de destino
-        subject: 'Correo enviado desde node js',
-        text: 'Ud. ha sido registrado en nuestra base de datos (nuevo mensaje 3).'
-    }, (err, response) => {
-        let mensaje = "";
-        if (err) {
-            mensaje = "Error: " + err;
-        } else {
-            mensaje = "Correo enviado satisfactoriamente.";
-        }
-        transporter.close();
-
-        console.log(mensaje);
-
-        res.json({
-            message: 'Llamando al método POST',
-            usuario
-        });
+    res.json({
+        usuario
     });
 }
 
-const usuariosPUT = (req = request, res = response) => {
+const usuariosPUT = async(req = request, res = response) => {
+    const { id } = req.params;
+    const { __v, _id, estado, google, password, ...resto } = req.body;
+
+    if (password) {
+        const salt = bcryptjs.genSaltSync(10);
+        const claveHASH = bcryptjs.hashSync(password, salt);
+        resto.password = claveHASH;
+    }
+
+    const usuario = await Usuario.findByIdAndUpdate(id, resto, { new: true });
+
     res.json({
-        message: 'Llamando al método PUT'
+        usuario
     });
 }
 
-const usuariosDELETE = (req = request, res = response) => {
+const usuariosDELETE = async(req = request, res = response) => {
+    const { id } = req.params;
+
+    //Eliminación física
+    const usuario = await Usuario.findByIdAndDelete(id);
+
     res.json({
-        message: 'Llamando al método DELETE'
+        message: 'Llamando al método DELETE',
+        usuario
     });
 }
 

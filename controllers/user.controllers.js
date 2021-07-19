@@ -3,6 +3,7 @@ const bcryptjs = require('bcryptjs');
 
 const Usuario = require('../models/user');
 const { enviarCorreo } = require('../helpers/validation-database');
+const { generarJWT } = require('../helpers/jwt');
 
 const usuariosGET = async(req = request, res = response) => {
 
@@ -25,32 +26,44 @@ const usuariosGET = async(req = request, res = response) => {
 }
 
 const usuariosPOST = async(req = request, res = response) => {
-    //Efectuar registro de usuario
-    const { nombre, email, password, img, rol } = req.body;
-    const usuario = new Usuario({
-        nombre,
-        email,
-        password,
-        img,
-        rol
-    });
+    try {
+        //Efectuar registro de usuario
+        const { nombre, email, password, img, rol } = req.body;
+        const usuario = new Usuario({
+            nombre,
+            email,
+            password,
+            img,
+            rol
+        });
 
-    const salt = bcryptjs.genSaltSync();
-    const claveHash = bcryptjs.hashSync(password, salt);
-    usuario.password = claveHash;
+        const salt = bcryptjs.genSaltSync();
+        const claveHash = bcryptjs.hashSync(password, salt);
+        usuario.password = claveHash;
 
-    usuario.save();
+        usuario.save();
 
-    //Enviar correo
-    await enviarCorreo(email).catch((err) => {
-        console.log('Error:', err);
-    }).then(() => {
-        console.log('Correo enviado satisfactoriamente.');
-    });
+        //Enviar correo
+        await enviarCorreo(email).catch((err) => {
+            console.log('Error:', err);
+        }).then(() => {
+            console.log('Correo enviado satisfactoriamente.');
+        });
 
-    res.json({
-        usuario
-    });
+        //Generar token
+        const jwt = await generarJWT(usuario.nombre, usuario.email);
+
+        res.status(201).json({
+            usuario,
+            token: jwt
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            err: error,
+            message: 'Por favor comunicarse con el administrador'
+        });
+    }
 }
 
 const usuariosPUT = async(req = request, res = response) => {
